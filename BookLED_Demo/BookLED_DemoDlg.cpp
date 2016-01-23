@@ -464,7 +464,7 @@ UINT CBookLED_DemoDlg::BookLEDDemo_Main(LPVOID lParam)
 	CmdIn = 0;
 	while (hSerial)
 	{
-		while (hSerial->UART_Count()//检测是否有收到串口数据
+		while (hSerial->UART_Count())//检测是否有收到串口数据
 		{
 			//有数据，分析
 			c1 = hSerial->UART_GetData();//读一个字节
