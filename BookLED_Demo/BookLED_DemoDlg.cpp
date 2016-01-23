@@ -18,6 +18,38 @@
 #define TID_TIMER2	2
 
 
+/*命令格式
+PC发给主机指令，会收到两次应答，第一次是主机的应答，第二次是执行分机的应答
+//3号分机的第5个灯灭掉
+81 00 03 05 44
+|  |  |  |  |___效验字节，(效验码0x3B) + 0x80 + 0x00 + 0x03 + 0x05  = 0xC4,这里要 & 0x7F,所以就变成 0x44
+|  |  |  |______1个字节的灯序号和亮灭指示,B0~B5为灯序号,B6为亮灭指示,B7是无效的，因为要 & 0x7F
+|  |  |_________2个字节的分机号，只有14位是有效的，因为参数要 & 0x7F
+|  |____________
+|_______________命令0,命令序号要或上0x80
+
+//3号分机的第5个灯亮
+81 00 03 45 04
+
+//2号分机的全部灯灭
+80 00 02 00 3D
+
+//2号分机的全部灯亮
+80 00 02 01 3E
+
+//500号分机的40号灯亮
+81 74 03 68 1B
+500--->0x1F4 ;
+40---->0x28 ;
+bffer[0] = 1 | 0x80 ;
+bffer[1] = 0x1F4 & 0x7F ;
+bffer[2] = (0x1F4 >> 7) & 0x7F ;
+bffer[3] = 0x28 & 0x7F ;
+bffer[3] = 0x40 ;//灯亮
+bffer[4] = 1B ;
+
+*/
+
 // 用于应用程序“关于”菜单项的 CAboutDlg 对话框
 
 class CAboutDlg : public CDialogEx
@@ -432,10 +464,10 @@ UINT CBookLED_DemoDlg::BookLEDDemo_Main(LPVOID lParam)
 	CmdIn = 0;
 	while (hSerial)
 	{
-		while (hSerial->UART_Count())
+		while (hSerial->UART_Count()//检测是否有收到串口数据
 		{
 			//有数据，分析
-			c1 = hSerial->UART_GetData();
+			c1 = hSerial->UART_GetData();//读一个字节
 			if ((c1 & 0x80) > 0)
 			{
 				c1 &= 0x7F;
@@ -585,14 +617,14 @@ void CBookLED_DemoDlg::OnBnClickedBuOpen()
 	WCHAR textBuff[255];
 
 	m_EdLEDNum.GetWindowTextW(textBuff, m_EdLEDNum.GetWindowTextLengthW()+1);
-	num = _wtoi(textBuff);
-	macNo = num / 44;
-	ledNo = num % 44;
-	sendBuff[0] = CMD0_SETBIT | 0x80;
-	sendBuff[1] = macNo & 0x7F;
+	num = _wtoi(textBuff);//得到灯号
+	macNo = num / 44;//得到分机号
+	ledNo = num % 44;//得到分机上的LED序号
+	sendBuff[0] = CMD0_SETBIT | 0x80;//命令 | 0x80
+	sendBuff[1] = macNo & 0x7F;	//2个字节的分机号参数
 	sendBuff[2] = (macNo >> 7) & 0x7F;
-	sendBuff[3] = ledNo & 0x3F;
-	sendBuff[3] |= 0x40;
+	sendBuff[3] = ledNo & 0x3F;//一个字节的灯序号,B0~B5有效
+	sendBuff[3] |= 0x40; //B6是亮\灭标志
 	c1 = VERIFY_CODE0;
 	for (c2 = 0; c2 < c_Parm0[CMD0_SETBIT] + 1; c2++)
 	{
@@ -700,6 +732,8 @@ void CBookLED_DemoDlg::OnBnClickedBuCloseall()
 void CBookLED_DemoDlg::OnBnClickedBuAssignopen()
 {
 	// TODO: 在此添加控件通知处理程序代码
+
+	//把要控制的灯序号填入到buffer
 	m_ThreadDataStruct.ledNumbers[0] = 0;
 	m_ThreadDataStruct.ledNumbers[1] = 1;
 	m_ThreadDataStruct.ledNumbers[2] = 20;
@@ -707,8 +741,9 @@ void CBookLED_DemoDlg::OnBnClickedBuAssignopen()
 	m_ThreadDataStruct.ledNumbers[4] = 50;
 	m_ThreadDataStruct.ledNumbers[5] = 45;
 	m_ThreadDataStruct.ledNumbers[6] = 70;
+	//要控制的灯的个数
 	m_ThreadDataStruct.ledMax = 7;
-
+	//开\关
 	m_ThreadDataStruct.level = 1;
 	//开一个线程来处理
 	m_pThreadAssignLED = AfxBeginThread((AFX_THREADPROC)CtrlAssignLED, &m_ThreadDataStruct, THREAD_PRIORITY_NORMAL, 0, CREATE_SUSPENDED, NULL);
