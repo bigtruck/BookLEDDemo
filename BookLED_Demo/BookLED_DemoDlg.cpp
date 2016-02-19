@@ -106,6 +106,7 @@ void CBookLED_DemoDlg::DoDataExchange(CDataExchange* pDX)
 	DDX_Control(pDX, IDC_BU_CLOSEALL, m_BuCloseAll);
 	DDX_Control(pDX, IDC_BU_ASSIGNOPEN, m_BuOpenAssign);
 	DDX_Control(pDX, IDC_BU_ASSIGNCLOSE, m_BuCloseAssign);
+	DDX_Control(pDX, IDC_BU_GET, m_BuGetNum);
 }
 
 BEGIN_MESSAGE_MAP(CBookLED_DemoDlg, CDialogEx)
@@ -121,6 +122,8 @@ BEGIN_MESSAGE_MAP(CBookLED_DemoDlg, CDialogEx)
 	ON_BN_CLICKED(IDC_BU_CLOSEALL, &CBookLED_DemoDlg::OnBnClickedBuCloseall)
 	ON_BN_CLICKED(IDC_BU_ASSIGNOPEN, &CBookLED_DemoDlg::OnBnClickedBuAssignopen)
 	ON_BN_CLICKED(IDC_BU_ASSIGNCLOSE, &CBookLED_DemoDlg::OnBnClickedBuAssignclose)
+	ON_BN_CLICKED(IDC_BU_GET, &CBookLED_DemoDlg::OnBnClickedBuGet)
+	ON_WM_CLOSE()
 END_MESSAGE_MAP()
 
 
@@ -172,15 +175,18 @@ BOOL CBookLED_DemoDlg::OnInitDialog()
 	m_ThreadDataStruct.ackCount = 0;
 	m_ThreadDataStruct.error = 0;
 	m_ThreadDataStruct.timeout = 0;
-	m_pThreadMain = AfxBeginThread((AFX_THREADPROC)BookLEDDemo_Main, &m_ThreadDataStruct, THREAD_PRIORITY_NORMAL,0, CREATE_SUSPENDED, NULL);
-	//m_pThreadMain->ResumeThread();
+	m_PThreadCheckCMD = AfxBeginThread((AFX_THREADPROC)CheckCMD, &m_ThreadDataStruct, THREAD_PRIORITY_NORMAL,0, CREATE_SUSPENDED, NULL);
+	//m_PThreadCheckCMD->ResumeThread();
+	m_pThreadWaitResponse = AfxBeginThread((AFX_THREADPROC)WaitResponse, &m_ThreadDataStruct, THREAD_PRIORITY_NORMAL, 0, CREATE_SUSPENDED, NULL);
+	m_pThreadWaitResponse->ResumeThread();
+
 	m_BuOpenBit.EnableWindow(FALSE);
 	m_BuCloseBit.EnableWindow(FALSE);
 	m_BuOpenAll.EnableWindow(FALSE);
 	m_BuCloseAll.EnableWindow(FALSE);
 	m_BuOpenAssign.EnableWindow(FALSE);
 	m_BuCloseAssign.EnableWindow(FALSE);
-
+	m_BuGetNum.EnableWindow(FALSE);
 
 	return TRUE;  // 除非将焦点设置到控件，否则返回 TRUE
 }
@@ -330,7 +336,7 @@ void CBookLED_DemoDlg::OnBnClickedOpenCommonPort()
 			//portOpen = TRUE ;
 			//m_hSerialThread->ClearBuffer();
 			//m_hSerialThread->ResumeThread();
-			//m_pThreadMain->ResumeThread();
+			//m_PThreadCheckCMD->ResumeThread();
 			//m_TimerID = SetTimer(TID_TIMER1, 1, 0);
 		}
 	}
@@ -338,7 +344,7 @@ void CBookLED_DemoDlg::OnBnClickedOpenCommonPort()
 	{
 		PortCloseDeal();
 		//KillTimer(m_TimerID);
-		//m_pThreadMain->SuspendThread();
+		//m_PThreadCheckCMD->SuspendThread();
 		//m_hSerialThread->CloseSerialPort();
 		//m_hSerialThread->SuspendThread();
 		//portOpen = FALSE;
@@ -365,11 +371,12 @@ void CBookLED_DemoDlg::PortOpenDeal(void)
 	m_BuCloseAll.EnableWindow(TRUE);
 	m_BuOpenAssign.EnableWindow(TRUE);
 	m_BuCloseAssign.EnableWindow(TRUE);
+	m_BuGetNum.EnableWindow(TRUE);
 	m_Button_OpenCOM.SetWindowTextW(L"关闭");
 	portOpen = TRUE;
 	m_hSerialThread->ClearBuffer();
 	m_hSerialThread->ResumeThread();
-	m_pThreadMain->ResumeThread();
+	m_PThreadCheckCMD->ResumeThread();
 	m_TimerID = 0;
 	m_TimerID = SetTimer(TID_TIMER1, 1, 0);
 
@@ -383,11 +390,12 @@ void CBookLED_DemoDlg::PortCloseDeal(void)
 	m_BuCloseAll.EnableWindow(FALSE);
 	m_BuOpenAssign.EnableWindow(FALSE);
 	m_BuCloseAssign.EnableWindow(FALSE);
+	m_BuGetNum.EnableWindow(FALSE);
 	if (m_TimerID != 0)
 	{
 		KillTimer(m_TimerID);
 	}
-	m_pThreadMain->SuspendThread();
+	m_PThreadCheckCMD->SuspendThread();
 	m_hSerialThread->CloseSerialPort();
 	m_hSerialThread->SuspendThread();
 	portOpen = FALSE;
@@ -448,7 +456,7 @@ const unsigned char	c_Parm0[] = {
 #define CMD0_SETBIT     1
 #define CMD0_ACK        2
 
-UINT CBookLED_DemoDlg::BookLEDDemo_Main(LPVOID lParam)
+UINT CBookLED_DemoDlg::CheckCMD(LPVOID lParam)
 {
 	//AfxMessageBox(L"led");
 	unsigned char	c1, c2, c3, c4, c5;
@@ -512,20 +520,20 @@ UINT CBookLED_DemoDlg::BookLEDDemo_Main(LPVOID lParam)
 								else if (pStruct->ackCount == 2)//第二次是执行分机的应答
 								{
 									pStruct->timeout = 0;
-									if (err == ERR_NOACK)
-									{
-										//pStruct->error = ERR_NOACK;
-										TRACE("mac no ack\r\n");
-										CString str;
-										str.Format(L"分机[%d]无应答", macNo);
-										AfxMessageBox(str);
-									}
-									else
-									{
-										TRACE("ok\r\n");
-									}
-									pStruct->error = ERR_NONE;
-									
+									pStruct->error = err;
+									pStruct->macNo = macNo;
+									//if (err == ERR_NOACK)
+									//{
+									//	TRACE("mac no ack\r\n");
+									//	CString str;
+									//	str.Format(L"分机[%d]无应答", macNo);
+									//	AfxMessageBox(str);
+									//}
+									//else
+									//{
+									//	TRACE("ok\r\n");
+									//}
+									//pStruct->error = ERR_NONE;
 								}
 								break;
 							}
@@ -534,18 +542,18 @@ UINT CBookLED_DemoDlg::BookLEDDemo_Main(LPVOID lParam)
 				}
 			}
 		}
-		if (pStruct->error != ERR_NONE)
-		{
-			if (pStruct->error == ERR_MAIN_TIMEOUT)
-			{
-				AfxMessageBox(L"主机应答超时",MB_OK | MB_ICONWARNING);
-			}
-			else if (pStruct->error == ERR_EXT_TIMEOUT)
-			{
-				AfxMessageBox(L"分机应答超时", MB_OK | MB_ICONWARNING);
-			}
-			pStruct->error = ERR_NONE;
-		}
+		//if (pStruct->error != ERR_NONE)
+		//{
+		//	if (pStruct->error == ERR_MAIN_TIMEOUT)
+		//	{
+		//		AfxMessageBox(L"主机应答超时",MB_OK | MB_ICONWARNING);
+		//	}
+		//	else if (pStruct->error == ERR_EXT_TIMEOUT)
+		//	{
+		//		AfxMessageBox(L"分机应答超时", MB_OK | MB_ICONWARNING);
+		//	}
+		//	pStruct->error = ERR_NONE;
+		//}
 		Sleep(2);
 	}
 	TRACE("main thread over\r\n");
@@ -602,6 +610,46 @@ UINT CBookLED_DemoDlg::CtrlAssignLED(LPVOID lParam)
 	return 0;
 }
 
+UINT CBookLED_DemoDlg::WaitResponse(LPVOID lParam)
+{
+	__ThreadMainData *pStruct = (__ThreadMainData*)lParam;
+	
+	while (1)
+	{
+		if (pStruct->error != ERR_NONE)
+		{
+			if (pStruct->error == ERR_MAIN_TIMEOUT)
+			{
+				AfxMessageBox(L"主机应答超时", MB_OK | MB_ICONWARNING);
+			}
+			else if (pStruct->error == ERR_EXT_TIMEOUT)
+			{
+				AfxMessageBox(L"分机应答超时", MB_OK | MB_ICONWARNING);
+			}
+			else if(pStruct->error == ERR_NOACK)
+			{
+				CString str;
+				if (pStruct->getMark)//是否是获取总的分机数量
+				{
+					str.Format(L"总的分机数量[%u]", pStruct->macNo);
+					AfxMessageBox(str, MB_OK | MB_ICONMASK);
+				}
+				else
+				{
+					str.Format(L"分机[%d]无应答", pStruct->macNo);
+					AfxMessageBox(str, MB_OK | MB_ICONWARNING);
+				}				
+			}
+			pStruct->error = ERR_NONE;
+
+			//break;
+		}
+	}
+
+	AfxEndThread(0);
+	return 0;
+}
+
 
 
 //UCHAR	testBuff[] = "Hello\r\n";
@@ -615,6 +663,8 @@ void CBookLED_DemoDlg::OnBnClickedBuOpen()
 	UINT num, macNo;
 	UCHAR sendBuff[10],c1,c2,ledNo;
 	WCHAR textBuff[255];
+
+	m_ThreadDataStruct.getMark = 0;
 
 	m_EdLEDNum.GetWindowTextW(textBuff, m_EdLEDNum.GetWindowTextLengthW()+1);
 	num = _wtoi(textBuff);//得到灯号
@@ -636,6 +686,10 @@ void CBookLED_DemoDlg::OnBnClickedBuOpen()
 
 	m_ThreadDataStruct.timeout = 1;
 	m_ThreadDataStruct.ackCount = 0;
+	m_ThreadDataStruct.error = ERR_NONE;
+	//m_pThreadWaitResponse = AfxBeginThread((AFX_THREADPROC)WaitResponse, &m_ThreadDataStruct, THREAD_PRIORITY_NORMAL, 0, CREATE_SUSPENDED, NULL);
+	//m_pThreadWaitResponse->ResumeThread();
+
 
 }
 
@@ -646,6 +700,8 @@ void CBookLED_DemoDlg::OnBnClickedBuClose()
 	UINT num, macNo;
 	UCHAR sendBuff[10], c1, c2, ledNo;
 	WCHAR textBuff[255];
+
+	m_ThreadDataStruct.getMark = 0;
 
 	m_EdLEDNum.GetWindowTextW(textBuff, m_EdLEDNum.GetWindowTextLengthW() + 1);
 	num = _wtoi(textBuff);
@@ -667,6 +723,9 @@ void CBookLED_DemoDlg::OnBnClickedBuClose()
 
 	m_ThreadDataStruct.timeout = 1;
 	m_ThreadDataStruct.ackCount = 0;
+	m_ThreadDataStruct.error = ERR_NONE;
+	//m_pThreadWaitResponse = AfxBeginThread((AFX_THREADPROC)WaitResponse, &m_ThreadDataStruct, THREAD_PRIORITY_NORMAL, 0, CREATE_SUSPENDED, NULL);
+	//m_pThreadWaitResponse->ResumeThread();
 
 }
 
@@ -677,6 +736,8 @@ void CBookLED_DemoDlg::OnBnClickedBuOpenall()
 	UINT num, macNo;
 	UCHAR sendBuff[10], c1, c2;
 	WCHAR textBuff[255];
+
+	m_ThreadDataStruct.getMark = 0;
 
 	m_EdMACNum.GetWindowTextW(textBuff, m_EdMACNum.GetWindowTextLengthW() + 1);
 	num = _wtoi(textBuff);
@@ -696,6 +757,9 @@ void CBookLED_DemoDlg::OnBnClickedBuOpenall()
 
 	m_ThreadDataStruct.timeout = 1;
 	m_ThreadDataStruct.ackCount = 0;
+	m_ThreadDataStruct.error = ERR_NONE;
+	//m_pThreadWaitResponse = AfxBeginThread((AFX_THREADPROC)WaitResponse, &m_ThreadDataStruct, THREAD_PRIORITY_NORMAL, 0, CREATE_SUSPENDED, NULL);
+	//m_pThreadWaitResponse->ResumeThread();
 
 }
 
@@ -706,6 +770,8 @@ void CBookLED_DemoDlg::OnBnClickedBuCloseall()
 	UINT num, macNo;
 	UCHAR sendBuff[10], c1, c2 ;
 	WCHAR textBuff[255];
+
+	m_ThreadDataStruct.getMark = 0;
 
 	m_EdMACNum.GetWindowTextW(textBuff, m_EdMACNum.GetWindowTextLengthW() + 1);
 	num = _wtoi(textBuff);
@@ -725,6 +791,9 @@ void CBookLED_DemoDlg::OnBnClickedBuCloseall()
 
 	m_ThreadDataStruct.timeout = 1;
 	m_ThreadDataStruct.ackCount = 0;
+	m_ThreadDataStruct.error = ERR_NONE;
+	//m_pThreadWaitResponse = AfxBeginThread((AFX_THREADPROC)WaitResponse, &m_ThreadDataStruct, THREAD_PRIORITY_NORMAL, 0, CREATE_SUSPENDED, NULL);
+	//m_pThreadWaitResponse->ResumeThread();
 
 }
 
@@ -732,6 +801,8 @@ void CBookLED_DemoDlg::OnBnClickedBuCloseall()
 void CBookLED_DemoDlg::OnBnClickedBuAssignopen()
 {
 	// TODO: 在此添加控件通知处理程序代码
+
+	m_ThreadDataStruct.getMark = 0;
 
 	//把要控制的灯序号填入到buffer
 	m_ThreadDataStruct.ledNumbers[0] = 0;
@@ -746,14 +817,17 @@ void CBookLED_DemoDlg::OnBnClickedBuAssignopen()
 	//开\关
 	m_ThreadDataStruct.level = 1;
 	//开一个线程来处理
-	m_pThreadAssignLED = AfxBeginThread((AFX_THREADPROC)CtrlAssignLED, &m_ThreadDataStruct, THREAD_PRIORITY_NORMAL, 0, CREATE_SUSPENDED, NULL);
-	m_pThreadAssignLED->ResumeThread();
+	//m_pThreadAssignLED = AfxBeginThread((AFX_THREADPROC)CtrlAssignLED, &m_ThreadDataStruct, THREAD_PRIORITY_NORMAL, 0, CREATE_SUSPENDED, NULL);
+	//m_pThreadAssignLED->ResumeThread();
 }
 
 
 void CBookLED_DemoDlg::OnBnClickedBuAssignclose()
 {
 	// TODO: 在此添加控件通知处理程序代码
+
+	m_ThreadDataStruct.getMark = 0;
+
 	m_ThreadDataStruct.ledNumbers[0] = 0;
 	m_ThreadDataStruct.ledNumbers[1] = 1;
 	m_ThreadDataStruct.ledNumbers[2] = 20;
@@ -764,7 +838,55 @@ void CBookLED_DemoDlg::OnBnClickedBuAssignclose()
 	m_ThreadDataStruct.ledMax = 7;
 
 	m_ThreadDataStruct.level = 0;
+
+	//m_pThreadWaitResponse = AfxBeginThread((AFX_THREADPROC)WaitResponse, &m_ThreadDataStruct, THREAD_PRIORITY_NORMAL, 0, CREATE_SUSPENDED, NULL);
+	//m_pThreadWaitResponse->ResumeThread();
 	m_pThreadAssignLED = AfxBeginThread((AFX_THREADPROC)CtrlAssignLED, &m_ThreadDataStruct, THREAD_PRIORITY_NORMAL, 0, CREATE_SUSPENDED, NULL);
 	m_pThreadAssignLED->ResumeThread();
 
+}
+
+
+void CBookLED_DemoDlg::OnBnClickedBuGet()
+{
+	// TODO: 在此添加控件通知处理程序代码
+
+	UINT num, macNo;
+	UCHAR sendBuff[10], c1, c2, ledNo;
+	WCHAR textBuff[255];
+
+	m_ThreadDataStruct.getMark = 1;
+
+	macNo = 10000;//分机号
+	ledNo = 1;//
+	sendBuff[0] = CMD0_SETBIT | 0x80;//命令 | 0x80
+	sendBuff[1] = macNo & 0x7F;	//2个字节的分机号参数
+	sendBuff[2] = (macNo >> 7) & 0x7F;
+	sendBuff[3] = ledNo & 0x3F;//一个字节的灯序号,B0~B5有效
+	sendBuff[3] |= 0x40; //B6是亮\灭标志
+	c1 = VERIFY_CODE0;
+	for (c2 = 0; c2 < c_Parm0[CMD0_SETBIT] + 1; c2++)
+	{
+		c1 += sendBuff[c2];
+	}
+	sendBuff[c2] = c1 & 0x7F;
+
+	m_hSerialThread->WriteData(sendBuff, c_Parm0[CMD0_SETBIT] + 2);
+
+	m_ThreadDataStruct.timeout = 1;
+	m_ThreadDataStruct.ackCount = 0;
+	m_ThreadDataStruct.error = ERR_NONE;
+
+	//m_pThreadWaitResponse = AfxBeginThread((AFX_THREADPROC)WaitResponse, &m_ThreadDataStruct, THREAD_PRIORITY_NORMAL, 0, CREATE_SUSPENDED, NULL);
+	//m_pThreadWaitResponse->ResumeThread();
+
+}
+
+
+void CBookLED_DemoDlg::OnClose()
+{
+	// TODO: 在此添加消息处理程序代码和/或调用默认值
+
+	m_hSerialThread->CloseSerialPort();
+	CDialogEx::OnClose();
 }

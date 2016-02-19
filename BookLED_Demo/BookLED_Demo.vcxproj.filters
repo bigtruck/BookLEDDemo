@@ -33,9 +33,6 @@
     <ClInclude Include="Resource.h">
       <Filter>头文件</Filter>
     </ClInclude>
-    <ClInclude Include="DemoMain.h">
-      <Filter>头文件</Filter>
-    </ClInclude>
     <ClInclude Include="SerialCommunicationThread.h">
       <Filter>头文件</Filter>
     </ClInclude>

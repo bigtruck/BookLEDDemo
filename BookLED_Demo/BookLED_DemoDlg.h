@@ -18,6 +18,8 @@ typedef struct
 	unsigned char   ackCount;
 	unsigned long   timeout;
 	unsigned char 	error;
+	UINT	macNo;
+	BOOL	getMark;
 
 	BOOL level;
 	UINT ledNumbers[100];
@@ -52,15 +54,17 @@ protected:
 public:
 	__ThreadMainData m_ThreadDataStruct;
 	BOOL portOpen;
-	CWinThread *m_pThreadMain;
+	CWinThread *m_PThreadCheckCMD;
 	CWinThread *m_pThreadAssignLED;
+	CWinThread *m_pThreadWaitResponse;
 	HANDLE *m_hThread;
 	SerialCommunicationThread *m_hSerialThread;
 	UINT m_TimerID;
 
-	static UINT WINAPI BookLEDDemo_Main(LPVOID lParam);
-	void ScanCommonPort(CComboBox *combobox);
+	static UINT WINAPI CheckCMD(LPVOID lParam);
 	static UINT WINAPI CtrlAssignLED(LPVOID lParam);
+	static UINT WINAPI WaitResponse(LPVOID lParam);
+	void ScanCommonPort(CComboBox *combobox);
 	void PortOpenDeal(void);
 	void PortCloseDeal(void);
 
@@ -86,4 +90,7 @@ public:
 	CButton m_BuCloseAll;
 	CButton m_BuOpenAssign;
 	CButton m_BuCloseAssign;
+	CButton m_BuGetNum;
+	afx_msg void OnBnClickedBuGet();
+	afx_msg void OnClose();
 };

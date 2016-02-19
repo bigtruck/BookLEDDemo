@@ -105,7 +105,6 @@
   <ItemGroup>
     <ClInclude Include="BookLED_Demo.h" />
     <ClInclude Include="BookLED_DemoDlg.h" />
-    <ClInclude Include="DemoMain.h" />
     <ClInclude Include="Resource.h" />
     <ClInclude Include="SerialCommunicationThread.h" />
     <ClInclude Include="stdafx.h" />
