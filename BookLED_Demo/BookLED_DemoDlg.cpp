@@ -170,7 +170,7 @@ BOOL CBookLED_DemoDlg::OnInitDialog()
 		MessageBox(L"本机没有串口", L"警告", MB_OK | MB_ICONWARNING);
 	}
 	portOpen = FALSE ;
-	m_hSerialThread = (SerialCommunicationThread *)AfxBeginThread(RUNTIME_CLASS(SerialCommunicationThread), 0, 0, CREATE_SUSPENDED);
+	m_hSerialThread = (SerialCommunicationThread *)AfxBeginThread(RUNTIME_CLASS(SerialCommunicationThread), 0, 1024*1024*2, CREATE_SUSPENDED);
 	m_ThreadDataStruct.hSerial = m_hSerialThread;
 	m_ThreadDataStruct.ackCount = 0;
 	m_ThreadDataStruct.error = 0;
@@ -851,9 +851,8 @@ void CBookLED_DemoDlg::OnBnClickedBuGet()
 {
 	// TODO: 在此添加控件通知处理程序代码
 
-	UINT num, macNo;
+	UINT macNo;
 	UCHAR sendBuff[10], c1, c2, ledNo;
-	WCHAR textBuff[255];
 
 	m_ThreadDataStruct.getMark = 1;
 
