@@ -25,6 +25,7 @@ typedef struct
 	UINT ledNumbers[100];
 	UINT ledMax;
 
+	INT totalMacNum;
 }__ThreadMainData;
 
 // CBookLED_DemoDlg ¶Ô»°¿ò

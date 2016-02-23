@@ -446,6 +446,7 @@ const unsigned char	c_Parm0[] = {
 	3 ,	//0
 	3 ,	//1
 	3 ,	//2
+	3 ,	//3
 };
 
 #define	GETSIZE			1024
@@ -455,6 +456,7 @@ const unsigned char	c_Parm0[] = {
 #define CMD0_SETALL     0
 #define CMD0_SETBIT     1
 #define CMD0_ACK        2
+#define CMD0_GETNUM		3
 
 UINT CBookLED_DemoDlg::CheckCMD(LPVOID lParam)
 {
@@ -522,19 +524,17 @@ UINT CBookLED_DemoDlg::CheckCMD(LPVOID lParam)
 									pStruct->timeout = 0;
 									pStruct->error = err;
 									pStruct->macNo = macNo;
-									//if (err == ERR_NOACK)
-									//{
-									//	TRACE("mac no ack\r\n");
-									//	CString str;
-									//	str.Format(L"分机[%d]无应答", macNo);
-									//	AfxMessageBox(str);
-									//}
-									//else
-									//{
-									//	TRACE("ok\r\n");
-									//}
-									//pStruct->error = ERR_NONE;
 								}
+								break;
+							case CMD0_GETNUM:
+								macNo = CmdBuf[2] & 0x7F;
+								macNo |= CmdBuf[1] & 0x7F;
+								pStruct->totalMacNum = macNo;
+								pStruct->timeout = 0;
+								pStruct->error = ERR_NONE;
+								CString str;
+								str.Format(L"总的分机数量[%u]", pStruct->totalMacNum);
+								AfxMessageBox(str, MB_OK | MB_ICONMASK);
 								break;
 							}
 						}
@@ -542,18 +542,6 @@ UINT CBookLED_DemoDlg::CheckCMD(LPVOID lParam)
 				}
 			}
 		}
-		//if (pStruct->error != ERR_NONE)
-		//{
-		//	if (pStruct->error == ERR_MAIN_TIMEOUT)
-		//	{
-		//		AfxMessageBox(L"主机应答超时",MB_OK | MB_ICONWARNING);
-		//	}
-		//	else if (pStruct->error == ERR_EXT_TIMEOUT)
-		//	{
-		//		AfxMessageBox(L"分机应答超时", MB_OK | MB_ICONWARNING);
-		//	}
-		//	pStruct->error = ERR_NONE;
-		//}
 		Sleep(2);
 	}
 	TRACE("main thread over\r\n");
@@ -629,20 +617,10 @@ UINT CBookLED_DemoDlg::WaitResponse(LPVOID lParam)
 			else if(pStruct->error == ERR_NOACK)
 			{
 				CString str;
-				if (pStruct->getMark)//是否是获取总的分机数量
-				{
-					str.Format(L"总的分机数量[%u]", pStruct->macNo);
-					AfxMessageBox(str, MB_OK | MB_ICONMASK);
-				}
-				else
-				{
-					str.Format(L"分机[%d]无应答", pStruct->macNo);
-					AfxMessageBox(str, MB_OK | MB_ICONWARNING);
-				}				
+				str.Format(L"分机[%d]无应答", pStruct->macNo);
+				AfxMessageBox(str, MB_OK | MB_ICONWARNING);
 			}
 			pStruct->error = ERR_NONE;
-
-			//break;
 		}
 	}
 
@@ -819,6 +797,9 @@ void CBookLED_DemoDlg::OnBnClickedBuAssignopen()
 	//开一个线程来处理
 	//m_pThreadAssignLED = AfxBeginThread((AFX_THREADPROC)CtrlAssignLED, &m_ThreadDataStruct, THREAD_PRIORITY_NORMAL, 0, CREATE_SUSPENDED, NULL);
 	//m_pThreadAssignLED->ResumeThread();
+	m_pThreadAssignLED = AfxBeginThread((AFX_THREADPROC)CtrlAssignLED, &m_ThreadDataStruct, THREAD_PRIORITY_NORMAL, 0, CREATE_SUSPENDED, NULL);
+	m_pThreadAssignLED->ResumeThread();
+
 }
 
 
@@ -856,24 +837,25 @@ void CBookLED_DemoDlg::OnBnClickedBuGet()
 
 	m_ThreadDataStruct.getMark = 1;
 
-	macNo = 10000;//分机号
+	macNo = 16000;//分机号
 	ledNo = 1;//
-	sendBuff[0] = CMD0_SETBIT | 0x80;//命令 | 0x80
+	sendBuff[0] = CMD0_GETNUM | 0x80;//命令 | 0x80
 	sendBuff[1] = macNo & 0x7F;	//2个字节的分机号参数
 	sendBuff[2] = (macNo >> 7) & 0x7F;
 	sendBuff[3] = ledNo & 0x3F;//一个字节的灯序号,B0~B5有效
 	sendBuff[3] |= 0x40; //B6是亮\灭标志
 	c1 = VERIFY_CODE0;
-	for (c2 = 0; c2 < c_Parm0[CMD0_SETBIT] + 1; c2++)
+	for (c2 = 0; c2 < c_Parm0[CMD0_GETNUM] + 1; c2++)
 	{
 		c1 += sendBuff[c2];
 	}
 	sendBuff[c2] = c1 & 0x7F;
 
-	m_hSerialThread->WriteData(sendBuff, c_Parm0[CMD0_SETBIT] + 2);
+	m_hSerialThread->WriteData(sendBuff, c_Parm0[CMD0_GETNUM] + 2);
 
 	m_ThreadDataStruct.timeout = 1;
 	m_ThreadDataStruct.ackCount = 0;
+	m_ThreadDataStruct.totalMacNum = -1;
 	m_ThreadDataStruct.error = ERR_NONE;
 
 	//m_pThreadWaitResponse = AfxBeginThread((AFX_THREADPROC)WaitResponse, &m_ThreadDataStruct, THREAD_PRIORITY_NORMAL, 0, CREATE_SUSPENDED, NULL);
